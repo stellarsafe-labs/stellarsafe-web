@@ -3,10 +3,11 @@
 import { useEffect } from "react";
 import { CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { reportError } from "@/lib/telemetry";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    console.error(error);
+    reportError(error, "boundary", error.digest);
   }, [error]);
   return (
     <main id="main" className="flex min-h-[60svh] flex-col items-center justify-center gap-4 p-6 text-center">

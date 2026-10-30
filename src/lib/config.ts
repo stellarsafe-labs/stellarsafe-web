@@ -16,6 +16,9 @@ const schema = z.object({
     .regex(/^C[A-Z2-7]{55}$/, "must be a contract address (C...)")
     .optional(),
   siteUrl: z.url().default("http://localhost:3000"),
+  /** Optional endpoint that receives client error reports (JSON via sendBeacon). */
+  errorReportUrl: z.url().optional(),
+  release: z.string().optional(),
   /** Must be explicitly enabled before the UI will talk to mainnet. */
   allowMainnet: z.boolean().default(false),
 });
@@ -30,6 +33,8 @@ const parsed = schema.safeParse({
   apiUrl: empty(process.env.NEXT_PUBLIC_API_URL),
   factoryContractId: empty(process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ID),
   siteUrl: empty(process.env.NEXT_PUBLIC_SITE_URL),
+  errorReportUrl: empty(process.env.NEXT_PUBLIC_ERROR_REPORT_URL),
+  release: empty(process.env.NEXT_PUBLIC_RELEASE),
   allowMainnet: process.env.NEXT_PUBLIC_ALLOW_MAINNET === "true",
 });
 

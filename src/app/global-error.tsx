@@ -1,6 +1,12 @@
 "use client";
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import { useEffect } from "react";
+import { reportError } from "@/lib/telemetry";
+
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    reportError(error, "global", error.digest);
+  }, [error]);
   return (
     <html lang="en">
       <body
