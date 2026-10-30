@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PolicyEditView } from "@/components/views/policy-view";
+import { PolicyEditView } from "@/components/views/policy-edit-view";
 
 export const metadata: Metadata = { title: "Edit policy" };
 
