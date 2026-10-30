@@ -14,8 +14,10 @@ export default defineConfig({
     env: { NEXT_PUBLIC_API_URL: "https://api.stellarsafe.test" },
     coverage: {
       provider: "v8",
-      include: ["src/lib/**"],
-      exclude: ["src/lib/**/*.test.ts"],
+      include: ["src/lib/**", "src/components/**"],
+      exclude: ["**/__tests__/**", "src/components/ui/**"],
+      // Ratchet: raise these as coverage grows; CI fails if it drops below.
+      thresholds: { statements: 45, branches: 34, functions: 38, lines: 45 },
     },
   },
 });
