@@ -62,8 +62,7 @@ function friendlyError(e: unknown): string {
 export function TxProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { address, sign } = useWallet();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [req, setReq] = useState<TxRequest<any> | null>(null);
+  const [req, setReq] = useState<TxRequest<unknown> | null>(null);
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("review");
   const [stage, setStage] = useState<TxStage>("building");
@@ -72,7 +71,13 @@ export function TxProvider({ children }: { children: React.ReactNode }) {
   const running = useRef(false);
 
   const run = useCallback(<T,>(r: TxRequest<T>) => {
-    setReq(r);
+    // Erase T without a cast: onSuccess gets the typed result captured from this request's own action.
+    let last: TxResult<T> | undefined;
+    setReq({
+      ...r,
+      action: async (ctx) => (last = await r.action(ctx)),
+      onSuccess: r.onSuccess && (() => last && r.onSuccess!(last)),
+    });
     setPhase("review");
     setStage("building");
     setError(null);
