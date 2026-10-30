@@ -20,6 +20,8 @@ import { explorer, network } from "@/lib/stellar/network";
 import { useWallet } from "@/lib/wallet/wallet-provider";
 import { WalletError } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
+import { ContractError } from "@/lib/domain/types";
+import { reportError } from "@/lib/telemetry";
 
 export interface TxRequest<T> {
   title: string;
@@ -99,6 +101,8 @@ export function TxProvider({ children }: { children: React.ReactNode }) {
       });
       req.onSuccess?.(res);
     } catch (e) {
+      // Contract rejections and wallet rejections are expected outcomes, not bugs.
+      if (!(e instanceof ContractError) && !(e instanceof WalletError)) reportError(e, "tx");
       setError(friendlyError(e));
       setPhase("error");
     } finally {
