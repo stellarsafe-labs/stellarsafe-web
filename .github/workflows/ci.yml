@@ -25,7 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm run test
+      - run: npm run format:check
+      - run: npm run test:coverage
       - run: npm run build
         env:
           NEXT_PUBLIC_DATA_SOURCE: demo
