@@ -11,6 +11,7 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
+    env: { NEXT_PUBLIC_API_URL: "https://api.stellarsafe.test" },
     coverage: {
       provider: "v8",
       include: ["src/lib/**"],
