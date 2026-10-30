@@ -17,12 +17,15 @@ import type { OnChainMember, OnChainTreasuryState, Role } from "@/lib/domain/typ
 import { RolePicker } from "./role-picker";
 
 interface DialogProps {
+  /** Open stays controlled by the view so Radix can play the close animation. */
+  open?: boolean;
   onClose: () => void;
 }
 
-/** Mount only while open so each opening starts from fresh state. */
+/** The view remounts this per opening (fresh state) and controls open so Radix can animate close. */
 export function AddMemberDialog({
   state,
+  open = true,
   onClose,
   onSubmit,
 }: DialogProps & {
@@ -35,7 +38,7 @@ export function AddMemberDialog({
   const error = newMemberError(state, address);
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add member</DialogTitle>
@@ -90,6 +93,7 @@ export function AddMemberDialog({
 
 export function RolesDialog({
   state,
+  open = true,
   member,
   memberLabel,
   onClose,
@@ -104,7 +108,7 @@ export function RolesDialog({
   const error = roleChangeError(state, member, roles);
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change roles</DialogTitle>
@@ -127,6 +131,7 @@ export function RolesDialog({
 
 export function LabelDialog({
   initial,
+  open = true,
   onClose,
   onSave,
 }: DialogProps & { initial: string; onSave: (label: string) => Promise<void> }) {
@@ -143,7 +148,7 @@ export function LabelDialog({
   };
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit display label</DialogTitle>
