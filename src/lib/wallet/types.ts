@@ -1,4 +1,4 @@
-export type WalletId = "freighter" | "demo";
+export type WalletId = "freighter" | "albedo" | "demo";
 
 export interface WalletAdapter {
   id: WalletId;
@@ -8,8 +8,8 @@ export interface WalletAdapter {
   isAvailable(): Promise<boolean>;
   /** Prompts the user and resolves with the selected account address. */
   connect(hint?: string): Promise<string>;
-  /** Returns the currently selected account without prompting, if any. */
-  getAddress(): Promise<string | null>;
+  /** Returns the currently selected account without prompting, if any. `saved` is the last connected address. */
+  getAddress(saved?: string): Promise<string | null>;
   signTransaction(xdr: string, opts: { address: string; networkPassphrase: string }): Promise<string>;
   /** Passphrase of the network the wallet is set to, when the wallet exposes it. */
   getNetworkPassphrase?(): Promise<string | null>;

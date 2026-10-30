@@ -9,12 +9,13 @@ import { getSession, setSession } from "@/lib/data/live/session";
 import type { TxSigner } from "@/lib/data/source";
 import { demoAdapter } from "./demo";
 import { freighterAdapter } from "./freighter";
+import { albedoAdapter } from "./albedo";
 import type { WalletAdapter, WalletId } from "./types";
 import { WalletError } from "./types";
 
 const STORAGE_KEY = "stellarsafe:wallet";
 
-export const WALLETS: WalletAdapter[] = isDemo ? [demoAdapter] : [freighterAdapter];
+export const WALLETS: WalletAdapter[] = isDemo ? [demoAdapter] : [freighterAdapter, albedoAdapter];
 
 type Status = "restoring" | "disconnected" | "connecting" | "connected";
 
@@ -73,7 +74,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         const saved = raw ? (JSON.parse(raw) as Persisted) : null;
         const w = saved && WALLETS.find((x) => x.id === saved.id);
         if (!saved || !w) return !cancelled && apply(null, null);
-        const addr = w.id === "demo" ? await w.connect(saved.address) : await w.getAddress();
+        const addr = w.id === "demo" ? await w.connect(saved.address) : await w.getAddress(saved.address);
         if (!cancelled) apply(addr ? w : null, addr);
       } catch {
         if (!cancelled) apply(null, null);

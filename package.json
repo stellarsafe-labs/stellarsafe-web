@@ -17,6 +17,7 @@
     "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
+    "@albedo-link/intent": "^0.13.0",
     "@hookform/resolvers": "^6.0.2",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^17.4.0",
