@@ -12,7 +12,10 @@ function albedoNetwork(): string {
 }
 
 function wrap(e: unknown): WalletError {
-  const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "Albedo request failed";
+  const msg =
+    e && typeof e === "object" && "message" in e
+      ? String((e as { message: unknown }).message)
+      : "Albedo request failed";
   const code = e && typeof e === "object" && "code" in e ? Number((e as { code: unknown }).code) : undefined;
   // Albedo uses code -4 for "user rejected"; popup blockers surface as a generic error.
   return new WalletError(
