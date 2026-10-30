@@ -6,18 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,47 +15,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { PageHeader } from "@/components/shared/page-header";
 import { Address } from "@/components/shared/address";
 import { RoleBadges, roleLabel } from "@/components/shared/role-badges";
 import { ChainBadge } from "@/components/shared/chain-badge";
+import { ROLE_HELP } from "@/components/features/members/role-picker";
+import { AddMemberDialog, LabelDialog, RolesDialog } from "@/components/features/members/member-dialogs";
 import { useTx } from "@/components/tx/tx-provider";
 import { getDataSource } from "@/lib/data";
-import { can, validatePolicy } from "@/lib/domain/policy";
+import { can } from "@/lib/domain/policy";
+import { removalError } from "@/lib/domain/membership";
 import { ROLES, type OnChainMember, type Role } from "@/lib/domain/types";
-import { isAccountAddress, isContractAddress } from "@/lib/stellar/address";
 import { fmtDate } from "@/lib/format";
 import { qk, useAddressLabel, useMe, useTreasuryId, useTreasuryMetadata, useTreasuryState } from "@/lib/query/hooks";
 import { useWallet } from "@/lib/wallet/wallet-provider";
-
-const ROLE_HELP: Record<Role, string> = {
-  admin: "Manage members, policy and treasury settings. Can cancel any proposal.",
-  approver: "Approve payment proposals. Counts toward approval thresholds.",
-  proposer: "Create payment proposals within the policy.",
-};
-
-function RolePicker({ value, onChange }: { value: Role[]; onChange: (r: Role[]) => void }) {
-  return (
-    <FieldSet>
-      <FieldLegend variant="label">On-chain roles</FieldLegend>
-      <FieldDescription>No roles means view-only access.</FieldDescription>
-      {ROLES.map((r) => (
-        <Field key={r} orientation="horizontal">
-          <Checkbox
-            id={`role-${r}`}
-            checked={value.includes(r)}
-            onCheckedChange={(c) => onChange(c ? [...value, r] : value.filter((x) => x !== r))}
-          />
-          <div className="grid gap-0.5">
-            <FieldLabel htmlFor={`role-${r}`}>{roleLabel(r)}</FieldLabel>
-            <FieldDescription>{ROLE_HELP[r]}</FieldDescription>
-          </div>
-        </Field>
-      ))}
-    </FieldSet>
-  );
-}
 
 type DialogState =
   { kind: "add" } | { kind: "roles"; member: OnChainMember } | { kind: "label"; member: OnChainMember } | null;
@@ -80,10 +43,6 @@ export function MembersView() {
   const { data: state } = useTreasuryState(id);
   const meta = useTreasuryMetadata(id);
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [newAddr, setNewAddr] = useState("");
-  const [roles, setRoles] = useState<Role[]>(["approver"]);
-  const [labelText, setLabelText] = useState("");
-  const [savingLabel, setSavingLabel] = useState(false);
 
   const isAdmin = can(me, "manage_members");
   const ds = getDataSource();
@@ -93,25 +52,7 @@ export function MembersView() {
   const approverCount = state.members.filter((m) => m.roles.includes("approver")).length;
   const maxRequired = Math.max(...state.policy.approvalTiers.map((t) => t.requiredApprovals));
 
-  const addrError =
-    newAddr && !(isAccountAddress(newAddr.trim()) || isContractAddress(newAddr.trim()))
-      ? "Enter a valid Stellar address (G… or C…)"
-      : state.members.some((m) => m.address === newAddr.trim())
-        ? "This address is already a member"
-        : null;
-
-  const policyErrorFor = (next: OnChainMember[]) => validatePolicy(state.policy, next)[0] ?? null;
-
-  const openAdd = () => {
-    setNewAddr("");
-    setRoles(["approver"]);
-    setLabelText("");
-    setDialog({ kind: "add" });
-  };
-
-  const submitAdd = () => {
-    const addr = newAddr.trim();
-    const name = labelText.trim();
+  const submitAdd = ({ address: addr, label: name, roles }: { address: string; label: string; roles: Role[] }) => {
     setDialog(null);
     run({
       title: "Add member",
@@ -136,7 +77,7 @@ export function MembersView() {
     });
   };
 
-  const submitRoles = (member: OnChainMember) => {
+  const submitRoles = (member: OnChainMember, roles: Role[]) => {
     setDialog(null);
     run({
       title: "Change roles",
@@ -173,34 +114,20 @@ export function MembersView() {
       action: (ctx) => ds.removeMember(id, member.address, ctx),
     });
 
-  const saveLabel = async (member: OnChainMember) => {
+  const saveLabel = async (member: OnChainMember, text: string) => {
     if (!address) return;
-    setSavingLabel(true);
     try {
       await ensureApiSession();
-      await ds.updateTreasuryMetadata(id, { memberLabels: { [member.address]: labelText.trim() } }, address);
+      await ds.updateTreasuryMetadata(id, { memberLabels: { [member.address]: text } }, address);
       await queryClient.invalidateQueries({ queryKey: qk.metadata(id) });
       toast.success("Label saved");
       setDialog(null);
     } catch (e) {
       toast.error("Couldn't save label", { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setSavingLabel(false);
     }
   };
 
-  const rolesDialogMember = dialog?.kind === "roles" ? dialog.member : null;
-  const rolesChangeError = rolesDialogMember
-    ? (() => {
-        const admins = state.members.filter((m) => m.roles.includes("admin"));
-        if (rolesDialogMember.roles.includes("admin") && !roles.includes("admin") && admins.length === 1) {
-          return "A treasury must keep at least one admin.";
-        }
-        return policyErrorFor(
-          state.members.map((m) => (m.address === rolesDialogMember.address ? { ...m, roles } : m)),
-        );
-      })()
-    : null;
+  const close = () => setDialog(null);
 
   return (
     <>
@@ -209,7 +136,7 @@ export function MembersView() {
         description="Membership and roles live in the treasury contract. Labels are optional, off-chain, and only for display."
         actions={
           isAdmin && (
-            <Button onClick={openAdd}>
+            <Button onClick={() => setDialog({ kind: "add" })}>
               <UserPlus aria-hidden /> Add member
             </Button>
           )
@@ -273,30 +200,16 @@ export function MembersView() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              setRoles(m.roles);
-                              setDialog({ kind: "roles", member: m });
-                            }}
-                          >
+                          <DropdownMenuItem onSelect={() => setDialog({ kind: "roles", member: m })}>
                             <Pencil aria-hidden /> Change roles
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              setLabelText(meta.data?.memberLabels[m.address] ?? "");
-                              setDialog({ kind: "label", member: m });
-                            }}
-                          >
+                          <DropdownMenuItem onSelect={() => setDialog({ kind: "label", member: m })}>
                             <Tag aria-hidden /> Edit label
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
-                            disabled={
-                              !!policyErrorFor(state.members.filter((x) => x.address !== m.address)) ||
-                              (m.roles.includes("admin") &&
-                                state.members.filter((x) => x.roles.includes("admin")).length === 1)
-                            }
+                            disabled={!!removalError(state, m)}
                             onSelect={() => remove(m)}
                           >
                             <UserMinus aria-hidden /> Remove
@@ -312,95 +225,23 @@ export function MembersView() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialog?.kind === "add"} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add member</DialogTitle>
-            <DialogDescription>
-              Membership is written to the treasury contract and requires your admin signature.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5">
-            <Field data-invalid={!!addrError || undefined}>
-              <FieldLabel htmlFor="member-address">Stellar address</FieldLabel>
-              <Input
-                id="member-address"
-                className="font-mono"
-                placeholder="G…"
-                value={newAddr}
-                onChange={(e) => setNewAddr(e.target.value)}
-                aria-invalid={!!addrError}
-                spellCheck={false}
-                autoComplete="off"
-              />
-              {addrError && <FieldError>{addrError}</FieldError>}
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="member-label">
-                Display label <span className="text-muted-foreground font-normal">(optional, off-chain)</span>
-              </FieldLabel>
-              <Input
-                id="member-label"
-                placeholder="e.g. Jordan · Finance"
-                value={labelText}
-                onChange={(e) => setLabelText(e.target.value)}
-                maxLength={60}
-              />
-            </Field>
-            <RolePicker value={roles} onChange={setRoles} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button onClick={submitAdd} disabled={!newAddr || !!addrError}>
-              Continue
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={dialog?.kind === "roles"} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change roles</DialogTitle>
-            <DialogDescription>{rolesDialogMember && label(rolesDialogMember.address)}</DialogDescription>
-          </DialogHeader>
-          <RolePicker value={roles} onChange={setRoles} />
-          {rolesChangeError && <FieldError>{rolesChangeError}</FieldError>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button onClick={() => rolesDialogMember && submitRoles(rolesDialogMember)} disabled={!!rolesChangeError}>
-              Continue
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={dialog?.kind === "label"} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit display label</DialogTitle>
-            <DialogDescription>
-              Labels are stored by the StellarSafe API and shown next to the address. They have no on-chain effect.
-            </DialogDescription>
-          </DialogHeader>
-          <Field>
-            <FieldLabel htmlFor="edit-label">Label</FieldLabel>
-            <Input id="edit-label" value={labelText} onChange={(e) => setLabelText(e.target.value)} maxLength={60} />
-          </Field>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button onClick={() => dialog?.kind === "label" && saveLabel(dialog.member)} disabled={savingLabel}>
-              Save label
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialog?.kind === "add" && <AddMemberDialog state={state} onClose={close} onSubmit={submitAdd} />}
+      {dialog?.kind === "roles" && (
+        <RolesDialog
+          state={state}
+          member={dialog.member}
+          memberLabel={label(dialog.member.address)}
+          onClose={close}
+          onSubmit={(roles) => submitRoles(dialog.member, roles)}
+        />
+      )}
+      {dialog?.kind === "label" && (
+        <LabelDialog
+          initial={meta.data?.memberLabels[dialog.member.address] ?? ""}
+          onClose={close}
+          onSave={(text) => saveLabel(dialog.member, text)}
+        />
+      )}
     </>
   );
 }
