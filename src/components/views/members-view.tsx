@@ -43,6 +43,9 @@ export function MembersView() {
   const { data: state } = useTreasuryState(id);
   const meta = useTreasuryMetadata(id);
   const [dialog, setDialog] = useState<DialogState>(null);
+  // The last opened dialog stays mounted after close so Radix can run its exit animation.
+  const [shown, setShown] = useState<Exclude<DialogState, null> | null>(null);
+  const [opening, setOpening] = useState(0);
 
   const isAdmin = can(me, "manage_members");
   const ds = getDataSource();
@@ -127,6 +130,12 @@ export function MembersView() {
     }
   };
 
+  const openDialog = (next: Exclude<DialogState, null>) => {
+    setShown(next);
+    setDialog(next);
+    setOpening((n) => n + 1);
+  };
+
   const close = () => setDialog(null);
 
   return (
@@ -136,7 +145,7 @@ export function MembersView() {
         description="Membership and roles live in the treasury contract. Labels are optional, off-chain, and only for display."
         actions={
           isAdmin && (
-            <Button onClick={() => setDialog({ kind: "add" })}>
+            <Button onClick={() => openDialog({ kind: "add" })}>
               <UserPlus aria-hidden /> Add member
             </Button>
           )
@@ -200,10 +209,10 @@ export function MembersView() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setDialog({ kind: "roles", member: m })}>
+                          <DropdownMenuItem onSelect={() => openDialog({ kind: "roles", member: m })}>
                             <Pencil aria-hidden /> Change roles
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => setDialog({ kind: "label", member: m })}>
+                          <DropdownMenuItem onSelect={() => openDialog({ kind: "label", member: m })}>
                             <Tag aria-hidden /> Edit label
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -225,21 +234,33 @@ export function MembersView() {
         </CardContent>
       </Card>
 
-      {dialog?.kind === "add" && <AddMemberDialog state={state} onClose={close} onSubmit={submitAdd} />}
-      {dialog?.kind === "roles" && (
-        <RolesDialog
+      {shown?.kind === "add" && (
+        <AddMemberDialog
+          key={`add-${opening}`}
+          open={dialog?.kind === "add"}
           state={state}
-          member={dialog.member}
-          memberLabel={label(dialog.member.address)}
           onClose={close}
-          onSubmit={(roles) => submitRoles(dialog.member, roles)}
+          onSubmit={submitAdd}
         />
       )}
-      {dialog?.kind === "label" && (
-        <LabelDialog
-          initial={meta.data?.memberLabels[dialog.member.address] ?? ""}
+      {shown?.kind === "roles" && (
+        <RolesDialog
+          key={`roles-${opening}`}
+          open={dialog?.kind === "roles"}
+          state={state}
+          member={shown.member}
+          memberLabel={label(shown.member.address)}
           onClose={close}
-          onSave={(text) => saveLabel(dialog.member, text)}
+          onSubmit={(roles) => submitRoles(shown.member, roles)}
+        />
+      )}
+      {shown?.kind === "label" && (
+        <LabelDialog
+          key={`label-${opening}`}
+          open={dialog?.kind === "label"}
+          initial={meta.data?.memberLabels[shown.member.address] ?? ""}
+          onClose={close}
+          onSave={(text) => saveLabel(shown.member, text)}
         />
       )}
     </>
